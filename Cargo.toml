@@ -1,0 +1,10 @@
+[package]
+name = "blocklist"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4.44"
+rayon = "1.12.0"
+reqwest = "0.12.22"
+tokio = { version = "1.52.1", features = ["full"] }

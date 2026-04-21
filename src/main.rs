@@ -1,0 +1,173 @@
+use chrono::Utc;
+use rayon::prelude::*;
+use reqwest::Client;
+use std::collections::HashSet;
+use std::error::Error;
+use std::fs::{self, File};
+use std::io::Write;
+use std::time::Instant;
+use tokio::task::JoinHandle;
+
+fn filter(strings: &[String]) -> (String, String) {
+    let utc = format!("! Last modified: {}", Utc::now().to_string());
+
+    let mut final_merge_block: Vec<String> = vec![
+        "! Blocklist: Blist".to_string(),
+        utc.clone(),
+        "! More info: https://github.com/Tahosol/blist-v2".to_string(),
+    ];
+    let mut final_merge_allow: Vec<String> = vec![
+        "! Allowlist: Blist".to_string(),
+        utc,
+        "! More info: https://github.com/Tahosol/blist-v2".to_string(),
+    ];
+
+    let mut filter_set: HashSet<String> = HashSet::new();
+    let mut sub_domain: Vec<String> = vec![];
+
+    let now = Instant::now();
+
+    let all_lines: Vec<String> = strings
+        .par_iter()
+        .flat_map(|string| {
+            string
+                .lines()
+                .map(|l| l.trim().to_string())
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    let processed: Vec<(Option<String>, String)> = all_lines
+        .par_iter()
+        .map(|line| (clear_url(line), line.clone()))
+        .collect();
+
+    for (url_opt, line) in processed {
+        if let Some(url) = url_opt {
+            if !url.is_empty() && !has_sub_domain(&url) && !filter_set.contains(&url) {
+                filter_set.insert(url);
+            } else if !url.is_empty() {
+                sub_domain.push(url);
+            }
+        } else if !filter_set.contains(&line) {
+            filter_set.insert(line);
+        }
+    }
+    for i in sub_domain {
+        let url = get_root_domain(&i);
+        if !filter_set.contains(&url) && !filter_set.contains(&i) {
+            filter_set.insert(i);
+        }
+    }
+
+    for i in filter_set.iter() {
+        if i.starts_with("@@") {
+            final_merge_allow.push(
+                i.to_string()
+                    .replace("@@", "")
+                    .replace("||", "")
+                    .replacen("^", "", 1),
+            );
+        } else if !i.starts_with("|") && !i.starts_with("/^") {
+            final_merge_block.push(i.to_string());
+        }
+    }
+    final_merge_allow.sort();
+    final_merge_block.sort();
+    let elapsed = now.elapsed();
+    println!("Elapsed in merge: {:.2?}", elapsed);
+    (final_merge_block.join("\n"), final_merge_allow.join("\n"))
+}
+fn clear_url(line: &str) -> Option<String> {
+    if line.starts_with("0.0.0.0 ") || line.starts_with("127.0.0.1 ") {
+        let clean_line = line.replace("0.0.0.0 ", "").replace("127.0.0.1 ", "");
+        let clean_line = clean_line.trim();
+        return Some(clean_line.to_string());
+    } else if line.trim().starts_with('!')
+        || line.trim().starts_with('#')
+        || line.trim().starts_with('[')
+    {
+        return Some(String::new());
+    } else if line.starts_with("||") {
+        let clean_line = line.replace("||", "").replace("^", "");
+        return Some(clean_line);
+    } else if line.contains("*") || line.starts_with("@@") || line.contains("/") {
+        return None;
+    }
+    Some(line.trim().to_string())
+}
+
+fn has_sub_domain(url: &str) -> bool {
+    if url != get_root_domain(url) {
+        return true;
+    }
+    false
+}
+use std::sync::OnceLock;
+
+static TWO_PART_TLDS: OnceLock<HashSet<String>> = OnceLock::new();
+
+fn get_root_domain(domain: &str) -> String {
+    let parts: Vec<&str> = domain.split('.').collect();
+    if parts.len() < 2 {
+        return domain.to_string();
+    }
+
+    let two_part_tlds = TWO_PART_TLDS.get_or_init(|| {
+        let content = fs::read_to_string("2part.txt").unwrap();
+        content.lines().map(|line| line.to_string()).collect()
+    });
+
+    let last_two = format!("{}.{}", parts[parts.len() - 2], parts[parts.len() - 1]);
+    if two_part_tlds.contains(&last_two) && parts.len() >= 3 {
+        format!("{}.{}", parts[parts.len() - 3], last_two)
+    } else {
+        format!("{}.{}", parts[parts.len() - 2], parts[parts.len() - 1])
+    }
+}
+
+async fn fetch_url(client: &Client, url: &str) -> Result<String, reqwest::Error> {
+    let res = client.get(url).send().await?;
+    let content = res.text().await?;
+    Ok(content)
+}
+
+fn read_urls(file_path: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let contents = fs::read_to_string(file_path)?;
+    let urls: Vec<String> = contents.lines().map(|line| line.to_string()).collect();
+    Ok(urls)
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let time = Instant::now();
+    let mut file_block = File::create("blocklist.txt")?;
+    let mut file_allow = File::create("allowlist.txt")?;
+    let urls_list = read_urls("credit.txt")?;
+    let mut content = vec![];
+
+    let handles: Vec<JoinHandle<Result<String, reqwest::Error>>> = urls_list
+        .into_iter()
+        .map(|url| {
+            let client = Client::new();
+            tokio::spawn(async move { fetch_url(&client, &url).await })
+        })
+        .collect();
+
+    for handle in handles {
+        match handle.await {
+            Ok(Ok(text)) => content.push(text),
+            Ok(Err(e)) => println!("Error fetching url: {:?}", e),
+            Err(e) => println!("Join error: {:?}", e),
+        }
+    }
+
+    let (blocklist, allowlist) = filter(&content);
+
+    file_block.write_all(blocklist.as_bytes())?;
+    file_allow.write_all(allowlist.as_bytes())?;
+    let end = time.elapsed();
+    println!("Done after {:?}", end);
+
+    Ok(())
+}
