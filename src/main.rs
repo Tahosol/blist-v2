@@ -68,7 +68,11 @@ fn filter(strings: &[String]) -> (String, String) {
                     .replace("||", "")
                     .replacen("^", "", 1),
             );
-        } else if !i.starts_with("|") && !i.starts_with("/^") {
+        } else if !i.starts_with("|")
+            && !i.starts_with("/^")
+            && !i.starts_with(".")
+            && !i.ends_with("|")
+        {
             final_merge_block.push(i.to_string());
         }
     }
