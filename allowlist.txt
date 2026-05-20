@@ -1,5 +1,5 @@
 ! Allowlist: Blist
-! Last modified: 2026-05-19 03:57:57.876850961 UTC
+! Last modified: 2026-05-20 03:34:28.308082541 UTC
 ! More info: https://github.com/Tahosol/blist-v2
 ad-block.dns.adguard.com
 ad-gone.com
@@ -10,6 +10,7 @@ ad.siemens.com.cn
 ads.privacy.qq.com
 ads.taboola.com
 advertisement.taobao.com
+analysis.chess.com
 analysis.windows.net
 api.huangye.miui.com
 app.adjust.com
