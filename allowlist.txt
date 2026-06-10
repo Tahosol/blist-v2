@@ -1,5 +1,5 @@
 ! Allowlist: Blist
-! Last modified: 2026-06-09 03:55:03.763655459 UTC
+! Last modified: 2026-06-10 03:42:14.519896752 UTC
 ! More info: https://github.com/Tahosol/blist-v2
 ad-block.dns.adguard.com
 ad-gone.com
