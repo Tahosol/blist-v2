@@ -10,6 +10,12 @@ It is in the [credit.txt](https://github.com/Tahosol/blist-v2/blob/master/credit
 
 ### Raw link: https://raw.githubusercontent.com/Tahosol/blist-v2/refs/heads/master/blocklist.txt
 
-Put raw link into your pihole/adguard home filter list
+`blocklist.txt` is generated as a no-IP domain list:
+
+```text
+example.com
+```
+
+It contains domains only, matching the allowlist style.
 
 ## DO NOT USE THIS WITH ANY OTHER BLOCKLIST IN THE CREDIT FILE
