@@ -1,5 +1,5 @@
 # Allowlist: Blist
-# Last modified: 2026-09-10T03:52:38.238515595+00:00
+# Last modified: 2026-09-11T03:14:10.464519572+00:00
 # More info: https://github.com/Tahosol/blist-v2
 ad-block.dns.adguard.com
 ad-gone.com
@@ -7,6 +7,7 @@ ad-putting.gw.zt-express.com
 ad.azure.com
 ad.cityu.edu.hk
 ad.siemens.com.cn
+ads.finance
 ads.privacy.qq.com
 ads.taboola.com
 advertisement.taobao.com
